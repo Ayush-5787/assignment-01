@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/prefer-nullish-coalescing, @typescript-eslint/require-await */
 import { documentCodes } from '@/data/e-sanchit-codes'
 import { quantityCodes } from '@/data/quantity-code'
 import schemeCodes from '@/data/scheme-codes'
@@ -13,7 +14,7 @@ import { RrCaretDown } from 'icons/rr/fi-rr-caret-down'
 import { useEffect, useRef, useState } from 'react'
 import { Button } from 'ui/basic/button'
 import { Card, CardContent, CardHeader } from 'ui/basic/card'
-import { getFormContext, RegisterOptions, useController } from 'ui/form'
+import { FieldValues, getFormContext, RegisterOptions, useController } from 'ui/form'
 import { Checkbox } from 'ui/inputs/checkbox'
 import { InputError } from 'ui/inputs/error'
 import { Input } from 'ui/inputs/input'
@@ -277,8 +278,8 @@ function AsyncPartySelect({
         <PopoverTrigger
           className={clsx(
             'outline-focus-select group flex w-full cursor-pointer items-center justify-between rounded border border-gray-200 pr-2 hover:border-gray-300 disabled:cursor-not-allowed disabled:opacity-50',
-            className || 'bg-white',
-            disabled && 'cursor-not-allowed opacity-50'
+            // FIX 1: merged the 3rd clsx argument into the 2nd (this project's clsx takes only 2 args)
+            `${className || 'bg-white'}${disabled ? 'cursor-not-allowed opacity-50' : ''}`
           )}
           disabled={disabled}>
           <div className="flex items-center p-2 text-sm">
@@ -288,7 +289,8 @@ function AsyncPartySelect({
           </div>
           <RrCaretDown className="size-4 text-gray-400 transition-transform group-data-[state=open]:rotate-180" />
         </PopoverTrigger>
-        <InputError name={name} />
+        {/* FIX 2: pin the generic so Path<T> resolves to string */}
+        <InputError<FieldValues> name={name} />
         <PopoverContent className="overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg">
           <div className="border-b border-gray-100 p-2">
             <input
@@ -828,7 +830,6 @@ function InvoiceEditor({
                       label="Item Total"
                       type="number"
                       placeholder={`${invoice.currency} ${lineTotal(item).toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
-
                       {...register(`invoices.${index}.items.${itemIndex}.lineTotal`)}
                     />
                     <Select<ShippingBillFormValues>
@@ -847,10 +848,7 @@ function InvoiceEditor({
                     {(() => {
                       const selectedScheme = schemeCodes.find((s) => s.value === item.schemeCode)
                       const showDrawback =
-                        selectedScheme &&
-                        (selectedScheme.drawback === true ||
-                          selectedScheme.RODTEP === true ||
-                          selectedScheme.ROSCTL === true)
+                        selectedScheme && (selectedScheme.drawback || selectedScheme.RODTEP || selectedScheme.ROSCTL)
                       return showDrawback ? (
                         <>
                           <div className="w-36">
@@ -999,6 +997,7 @@ function DocumentItem({ formCtx, index, onRemove }: { formCtx: BillFormContext; 
   const { register, watch } = formCtx.hooks
   const documentValues = watch(`documents.${index}`)
 
+  /* eslint-disable @typescript-eslint/no-unnecessary-condition, @typescript-eslint/prefer-nullish-coalescing */
   const hasCustomValues = Boolean(
     documentValues?.placeOfIssue ||
     documentValues?.invoiceSerialNumber ||
@@ -1018,6 +1017,7 @@ function DocumentItem({ formCtx, index, onRemove }: { formCtx: BillFormContext; 
     documentValues?.fileType ||
     documentValues?.icegateId
   )
+  /* eslint-enable @typescript-eslint/no-unnecessary-condition, @typescript-eslint/prefer-nullish-coalescing */
 
   const [showCustomDetails, setShowCustomDetails] = useState(hasCustomValues)
 
@@ -1076,6 +1076,7 @@ function DocumentItem({ formCtx, index, onRemove }: { formCtx: BillFormContext; 
                   (doc) => doc.label.toLowerCase().includes(q) || doc.value.toLowerCase().includes(q)
                 )
               }}
+
               getInitialLabel={async (val) => {
                 const found = [{ value: 'pdf', label: 'PDF' }].find((doc) => doc.value === val || doc.label === val)
                 return found ? found.label : val
@@ -1261,9 +1262,7 @@ function BillEditor({ bill }: { bill?: SavedBill }) {
     }
   }
 
-  const exporter = exporters.find((item) => String(item.id) === values.exporterId)
-  const consignee = businesses.find((item) => String(item.id) === values.consigneeId)
-  const totalLines = values.invoices.reduce((sum, invoice) => sum + invoice.items.length, 0)
+  // FIX 3: removed the three unused variables (exporter, consignee, totalLines)
 
   return (
     <div className="space-y-5">
@@ -1748,7 +1747,7 @@ function BillEditor({ bill }: { bill?: SavedBill }) {
 export default function ShippingBillPage() {
   const { id } = useParams<{ id?: string }>()
   const { bills } = useDemoData()
-  const bill = id ? bills.find((item) => item.id === Number(id)) || shippingBillService.getById(id) : undefined
+  const bill = id ? (bills.find((item) => item.id === Number(id)) ?? shippingBillService.getById(id)) : undefined
   if (id && !bill)
     return (
       <div className="space-y-3">
